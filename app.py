@@ -1,5 +1,7 @@
 import streamlit as st
 import pandas as pd
+import io
+import numpy as np
 
 from sklearn.model_selection import train_test_split
 from sklearn.pipeline import Pipeline
@@ -22,7 +24,7 @@ TRAIN_DATA_PATH = "data/telco_churn_cleaned.csv"
 
 
 st.set_page_config(page_title="Telco Churn Classifier", layout="wide")
-st.title("Telco Customer Churn Prediction")
+st.title("Telcom Churn Predictor")
 
 
 # -------------------- DATA LOADING --------------------
@@ -101,86 +103,133 @@ def train_all_models_cached():
 
 
 # -------------------- UI --------------------
-st.sidebar.header("Controls")
 
-with st.sidebar.expander("Training configuration", expanded=True):
-    st.write(f"Random State: **{RANDOM_STATE}**")
-    st.write(f"Train file: **{TRAIN_DATA_PATH}**")
-    retrain = st.button("Re-train models (clear cache)")
+# Sidebar: controls and upload
+st.sidebar.header("Controls")
+st.sidebar.markdown("**Training configuration**")
+st.sidebar.write(f"Random State: **{RANDOM_STATE}**")
+st.sidebar.write(f"Train file: **{TRAIN_DATA_PATH}**")
+retrain = st.sidebar.button("Re-train models (clear cache)")
+
+st.sidebar.markdown("---")
+
+
+st.sidebar.markdown("**Upload / Sample Data**")
+uploaded_file = st.sidebar.file_uploader("Upload CSV (same features as training)", type=["csv"])
+
 
 if retrain:
     st.cache_resource.clear()
     st.success("Cache cleared. Models will retrain on next run.")
+    st.experimental_rerun()
 
-trained_models, metrics_df = train_all_models_cached()
+# Train / load models with a spinner to communicate progress
+with st.spinner("Training / loading models. This may take a moment..."):
+    trained_models, metrics_df = train_all_models_cached()
 
-# Metrics display
-col1, col2 = st.columns([1.2, 1])
+# Update the selectbox now that models are available
+selected_model_name = st.sidebar.selectbox("Choose model", options=sorted(trained_models.keys()))
 
-with col1:
-    st.subheader("Model Performance (Training Split)")
+# Top-level header and summary
+st.markdown("# 🚀 Telco Customer Churn Predictor")
+st.markdown("Predict customer churn using a set of trained ML models. Use the sidebar to choose a model and upload data.")
+
+# Highlight the best model
+best_idx = metrics_df["AUC"].idxmax()
+best_row = metrics_df.loc[best_idx]
+best_name = best_row["ML Model Name"]
+
+m1, m2, m3 = st.columns(3)
+m1.metric("Top model", best_name)
+m2.metric("Top AUC", f"{best_row['AUC']:.4f}")
+m3.metric("Top Accuracy", f"{best_row['Accuracy']:.4f}")
+
+st.divider()
+
+# Metrics table and charts
+left, right = st.columns([1.6, 1])
+with left:
+    st.subheader("Model performance (training split)")
     show_df = metrics_df.copy()
     for c in ["Accuracy", "AUC", "Precision", "Recall", "F1", "MCC"]:
         show_df[c] = show_df[c].round(4)
     show_df = show_df.sort_values("AUC", ascending=False)
-    st.dataframe(show_df, use_container_width=True)
 
-with col2:
-    st.subheader("Select Model for Predictions")
-    selected_model_name = st.selectbox("Model", sorted(trained_models.keys()))
-    st.write(f"Selected: **{selected_model_name}**")
+    st.dataframe(show_df.set_index("ML Model Name"), use_container_width=True)
+
+with right:
+    st.subheader("AUC comparison")
+    auc_df = metrics_df.set_index("ML Model Name")["AUC"].sort_values(ascending=True)
+    st.bar_chart(auc_df)
 
 st.divider()
 
-# Upload test CSV
-st.subheader("Upload Test CSV")
-uploaded_file = st.file_uploader("Upload CSV (with same feature columns)", type=["csv"])
-
+# Upload instructions
+st.subheader("Prediction inputs")
 if uploaded_file is None:
-    st.info("Upload a CSV file to generate predictions.")
+    st.info("Upload a CSV in the sidebar (use the sample CSV as guide).\nThe file should contain the same feature columns used for training. If it includes a 'Churn' column, the app will evaluate prediction quality.")
     st.stop()
 
+# Read uploaded CSV
 df = pd.read_csv(uploaded_file)
 
-st.subheader("Uploaded Data Preview")
-st.dataframe(df.head(15), use_container_width=True)
+with st.expander("Uploaded data preview", expanded=True):
+    st.write(f"Rows: {df.shape[0]} — Columns: {df.shape[1]}")
+    st.dataframe(df.head(10), use_container_width=True)
 
-model = trained_models[selected_model_name]
-
-# Prediction logic
-st.subheader("Predictions")
-
+# Prepare input features
 if "Churn" in df.columns:
-    X_in = df.drop(columns=["Churn"])
+    X_in = df.drop(columns=["Churn"]) 
     y_true = df["Churn"]
     has_labels = True
 else:
     X_in = df.copy()
     has_labels = False
 
-y_pred = model.predict(X_in)
+# Perform predictions using selected model
+model = trained_models[selected_model_name]
 y_prob = model.predict_proba(X_in)[:, 1]
+y_pred = model.predict(X_in)
 
 out_df = X_in.copy()
+out_df["Churn_Probability"] = np.round(y_prob, 4)
 out_df["Predicted_Churn"] = y_pred
-out_df["Churn_Probability"] = y_prob.round(4)
 
-st.dataframe(out_df.head(20), use_container_width=True)
+# Show sample of predictions and offer download
+st.subheader("Predictions")
+with st.expander("Prediction sample", expanded=True):
+    st.dataframe(out_df.head(20), use_container_width=True)
 
+# Download predictions as CSV
+csv_bytes = out_df.to_csv(index=False).encode("utf-8")
+st.download_button("Download predictions CSV", data=csv_bytes, file_name="predictions.csv", mime="text/csv")
+
+# If labels are present, show evaluation metrics and confusion matrix
 if has_labels:
-    st.subheader("Confusion Matrix")
-    cm = confusion_matrix(y_true, y_pred)
-    st.write(pd.DataFrame(
-        cm,
-        index=["Actual No", "Actual Yes"],
-        columns=["Predicted No", "Predicted Yes"]
-    ))
+    st.subheader("Evaluation on provided labels")
 
-    st.subheader("Classification Report")
-    st.text(classification_report(y_true, y_pred))
+    cm = confusion_matrix(y_true, y_pred)
+    cm_df = pd.DataFrame(cm, index=["Actual No", "Actual Yes"], columns=["Predicted No", "Predicted Yes"])
+
+    with st.expander("Confusion matrix", expanded=True):
+        # styled df provides a heatmap-like background
+        st.write(cm_df.style.background_gradient(cmap="Blues"))
+
+    with st.expander("Classification report", expanded=True):
+        report_df = pd.DataFrame(classification_report(y_true, y_pred, output_dict=True)).T
+        report_df["precision"] = report_df["precision"].round(4)
+        report_df["recall"] = report_df["recall"].round(4)
+        report_df["f1-score"] = report_df["f1-score"].round(4)
+        report_df["support"] = report_df["support"].astype(int)
+        st.dataframe(report_df, use_container_width=True)
+
 else:
-    st.info("No ground-truth labels (`Churn`) found in uploaded data. Showing prediction insights only.")
-    st.subheader("Prediction Distribution")
-    st.bar_chart(pd.Series(y_pred).value_counts())
-    st.subheader("Average Churn Probability")
-    st.write(round(float(y_prob.mean()), 4))
+    st.info("No ground-truth labels found in uploaded data. Showing prediction insights.")
+    st.subheader("Prediction distribution")
+    dist = pd.Series(y_pred).value_counts().sort_index()
+    st.bar_chart(dist)
+    st.subheader("Average churn probability")
+    st.metric("Average probability", f"{float(y_prob.mean()):.4f}")
+
+st.markdown("---")
+st.caption("Tip: Use the model selection in the sidebar to compare predictions and metrics.")
