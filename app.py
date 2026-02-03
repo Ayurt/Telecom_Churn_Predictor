@@ -134,16 +134,6 @@ selected_model_name = st.sidebar.selectbox("Choose model", options=sorted(traine
 st.markdown("# 🚀 Telco Customer Churn Predictor")
 st.markdown("Predict customer churn using a set of trained ML models. Use the sidebar to choose a model and upload data.")
 
-# Highlight the best model
-best_idx = metrics_df["AUC"].idxmax()
-best_row = metrics_df.loc[best_idx]
-best_name = best_row["ML Model Name"]
-
-m1, m2, m3 = st.columns(3)
-m1.metric("Top model", best_name)
-m2.metric("Top AUC", f"{best_row['AUC']:.4f}")
-m3.metric("Top Accuracy", f"{best_row['Accuracy']:.4f}")
-
 st.divider()
 
 # Metrics table and charts
