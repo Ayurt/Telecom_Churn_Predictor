@@ -1,4 +1,4 @@
-Telco Customer Churn Prediction
+Telcom Churn Predictor
 
 ML Assignment – 2 (Machine Learning)
 
@@ -8,7 +8,7 @@ Program: M.Tech (AI/ML) – Work Integrated Learning
 Course: Machine Learning
 
 GitHub Repository:
-https://github.com/yuganshjindal/Telco_Customer_Churn.git
+https://github.com/Ayurt/Telecom_Churn_Predictor
 
 Live Streamlit App:
 https://2025ab05174-ml-assignment2.streamlit.app/
