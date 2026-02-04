@@ -11,7 +11,7 @@ GitHub Repository:
 https://github.com/Ayurt/Telecom_Churn_Predictor
 
 Live Streamlit App:
-https://2025ab05174-ml-assignment2.streamlit.app/
+https://telecomchurnpredictor-cvjjfjzrnckpt4vhx5armh.streamlit.app/
 
 1. Problem Statement
 
