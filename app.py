@@ -121,7 +121,17 @@ uploaded_file = st.sidebar.file_uploader("Upload CSV (same features as training)
 if retrain:
     st.cache_resource.clear()
     st.success("Cache cleared. Models will retrain on next run.")
-    st.experimental_rerun()
+    # Try Streamlit rerun APIs if available; support multiple names across versions
+    if hasattr(st, "experimental_rerun"):
+        try:
+            st.experimental_rerun()
+        except Exception:
+            pass
+    elif hasattr(st, "rerun"):
+        try:
+            st.rerun()
+        except Exception:
+            pass
 
 # Train / load models with a spinner to communicate progress
 with st.spinner("Training / loading models. This may take a moment..."):
