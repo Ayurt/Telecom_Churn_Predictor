@@ -2,9 +2,6 @@ import streamlit as st
 import pandas as pd
 import io
 import numpy as np
-import os
-import joblib
-import glob
 
 from sklearn.model_selection import train_test_split
 from sklearn.pipeline import Pipeline
@@ -44,18 +41,6 @@ def load_training_data(path: str):
 # -------------------- MODEL TRAINING --------------------
 @st.cache_resource
 def train_all_models_cached():
-    # If pre-saved pipelines and metrics exist, load them to avoid retraining on startup
-    saved_all = "model/saved_models/all_models.joblib"
-    metrics_path = "model/metrics_table.csv"
-    if os.path.exists(saved_all) and os.path.exists(metrics_path):
-        try:
-            pipelines = joblib.load(saved_all)
-            metrics_df = pd.read_csv(metrics_path)
-            return pipelines, metrics_df
-        except Exception:
-            # If loading fails, fall back to retraining below
-            pass
-
     X, y = load_training_data(TRAIN_DATA_PATH)
 
     X_train, X_test, y_train, y_test = train_test_split(
@@ -114,15 +99,6 @@ def train_all_models_cached():
         trained[name] = pipe
 
     metrics_df = pd.DataFrame(results)
-
-    # Save trained pipelines and metrics for faster subsequent startups
-    try:
-        os.makedirs("model/saved_models", exist_ok=True)
-        joblib.dump(trained, "model/saved_models/all_models.joblib")
-        metrics_df.to_csv("model/metrics_table.csv", index=False)
-    except Exception:
-        # If saving fails, ignore — app will still work but may retrain next time
-        pass
     return trained, metrics_df
 
 
@@ -139,6 +115,7 @@ st.sidebar.markdown("---")
 
 st.sidebar.markdown("**Upload / Sample Data**")
 uploaded_file = st.sidebar.file_uploader("Upload CSV (same features as training)", type=["csv"])
+
 
 # Train / load models with a spinner to communicate progress
 with st.spinner("Training / loading models. This may take a moment..."):
