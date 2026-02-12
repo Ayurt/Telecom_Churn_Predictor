@@ -133,39 +133,12 @@ st.sidebar.header("Controls")
 st.sidebar.markdown("**Training configuration**")
 st.sidebar.write(f"Random State: **{RANDOM_STATE}**")
 st.sidebar.write(f"Train file: **{TRAIN_DATA_PATH}**")
-retrain = st.sidebar.button("Re-train models (clear cache)")
 
 st.sidebar.markdown("---")
 
 
 st.sidebar.markdown("**Upload / Sample Data**")
 uploaded_file = st.sidebar.file_uploader("Upload CSV (same features as training)", type=["csv"])
-
-
-if retrain:
-    # Remove saved model artifacts so training runs fresh
-    try:
-        files = glob.glob("model/saved_models/*.joblib")
-        for f in files:
-            os.remove(f)
-        if os.path.exists("model/metrics_table.csv"):
-            os.remove("model/metrics_table.csv")
-    except Exception:
-        pass
-
-    st.cache_resource.clear()
-    st.success("Cache cleared and saved models removed. Models will retrain on next run.")
-    # Try Streamlit rerun APIs if available
-    if hasattr(st, "experimental_rerun"):
-        try:
-            st.experimental_rerun()
-        except Exception:
-            pass
-    elif hasattr(st, "rerun"):
-        try:
-            st.rerun()
-        except Exception:
-            pass
 
 # Train / load models with a spinner to communicate progress
 with st.spinner("Training / loading models. This may take a moment..."):
